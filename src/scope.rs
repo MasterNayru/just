@@ -37,6 +37,7 @@ impl<'src, 'run> Scope<'src, 'run> {
         },
         prelude: true,
         private: false,
+        lazy: false,
         value: (*value).into(),
       });
     }

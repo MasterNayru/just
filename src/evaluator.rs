@@ -34,6 +34,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           scope.bind(Binding {
             export: assignment.export,
             file_depth: 0,
+            lazy: false,
             name: assignment.name,
             prelude: false,
             private: assignment.private,
@@ -183,6 +184,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           scope.bind(Binding {
             export: assignment.export,
             file_depth: 0,
+            lazy: false,
             name: assignment.name,
             prelude: false,
             private: assignment.private,
@@ -210,7 +212,9 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     };
 
     for assignment in module.assignments.values() {
-      evaluator.evaluate_assignment(assignment)?;
+      if !assignment.lazy {
+        evaluator.evaluate_assignment(assignment)?;
+      }
     }
 
     Ok(evaluator.scope)
@@ -227,6 +231,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         name: assignment.name,
         prelude: false,
         private: assignment.private,
+        lazy: false,
         value,
       });
     }
@@ -561,6 +566,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
         name: parameter.name,
         prelude: false,
         private: false,
+        lazy: false,
         value: values.join(" "),
       });
     }
@@ -575,7 +581,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     scope: &'run Scope<'src, 'run>,
   ) -> Self {
     Self {
-      assignments: None,
+      assignments: Some(&context.module.assignments),
       context: Some(*context),
       env,
       is_dependency,
