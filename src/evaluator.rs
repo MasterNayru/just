@@ -170,6 +170,7 @@ impl<'src, 'run> Evaluator<'src, 'run> {
     let context = ExecutionContext {
       config,
       dotenv,
+      lazy_cache: None,
       module,
       search,
     };
@@ -416,7 +417,38 @@ impl<'src, 'run> Evaluator<'src, 'run> {
           .assignments
           .and_then(|assignments| assignments.get(variable))
         {
-          Ok(self.evaluate_assignment(assignment)?.to_owned())
+          if assignment.lazy {
+            if let Some(ctx) = &self.context {
+              let cache_key = (ctx.module.module_path.clone(), variable.to_owned());
+              if let Some(cache) = ctx.lazy_cache {
+                let guard = cache.lock().unwrap();
+                if let Some(value) = guard.get(&cache_key).cloned() {
+                  drop(guard);
+                  self.scope.bind(Binding {
+                    export: assignment.export,
+                    file_depth: 0,
+                    lazy: false,
+                    name: *name,
+                    prelude: false,
+                    private: assignment.private,
+                    value: value.clone(),
+                  });
+                  return Ok(value);
+                }
+              }
+            }
+          }
+          let value = self.evaluate_assignment(assignment)?.to_owned();
+          if assignment.lazy {
+            if let Some(cache) = self.context.and_then(|ctx| ctx.lazy_cache) {
+              let cache_key = (
+                self.context.unwrap().module.module_path.clone(),
+                variable.to_owned(),
+              );
+              cache.lock().unwrap().insert(cache_key, value.clone());
+            }
+          }
+          Ok(value)
         } else {
           Err(Error::internal(format!(
             "attempted to evaluate undefined variable `{variable}`"

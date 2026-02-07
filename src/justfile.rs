@@ -210,12 +210,14 @@ impl<'src> Justfile<'src> {
     }
 
     let ran = Ran::default();
+    let lazy_cache: Mutex<BTreeMap<(String, String), String>> = Mutex::new(BTreeMap::new());
     for invocation in invocations {
       Self::run_recipe(
         &invocation.arguments,
         config,
         &dotenv,
         false,
+        &lazy_cache,
         &ran,
         invocation.recipe,
         &scopes,
@@ -263,6 +265,7 @@ impl<'src> Justfile<'src> {
     config: &Config,
     dotenv: &BTreeMap<String, String>,
     is_dependency: bool,
+    lazy_cache: &Mutex<BTreeMap<(String, String), String>>,
     ran: &Ran,
     recipe: &Recipe<'src>,
     scopes: &BTreeMap<String, (&Self, &Scope<'src, '_>)>,
@@ -293,6 +296,7 @@ impl<'src> Justfile<'src> {
     let context = ExecutionContext {
       config,
       dotenv,
+      lazy_cache: Some(lazy_cache),
       module,
       search,
     };
@@ -316,6 +320,7 @@ impl<'src> Justfile<'src> {
       recipe.priors(),
       dotenv,
       &mut evaluator,
+      lazy_cache,
       ran,
       recipe,
       scopes,
@@ -330,6 +335,7 @@ impl<'src> Justfile<'src> {
       recipe.subsequents(),
       dotenv,
       &mut evaluator,
+      lazy_cache,
       &Ran::default(),
       recipe,
       scopes,
@@ -345,6 +351,7 @@ impl<'src> Justfile<'src> {
     dependencies: &[Dependency<'src>],
     dotenv: &BTreeMap<String, String>,
     evaluator: &mut Evaluator<'src, 'run>,
+    lazy_cache: &Mutex<BTreeMap<(String, String), String>>,
     ran: &Ran,
     recipe: &Recipe<'src>,
     scopes: &BTreeMap<String, (&Self, &Scope<'src, 'run>)>,
@@ -373,7 +380,7 @@ impl<'src> Justfile<'src> {
         for (recipe, arguments) in evaluated {
           handles.push(thread_scope.spawn(move || {
             Self::run_recipe(
-              &arguments, config, dotenv, true, ran, recipe, scopes, search,
+              &arguments, config, dotenv, true, lazy_cache, ran, recipe, scopes, search,
             )
           }));
         }
@@ -387,7 +394,7 @@ impl<'src> Justfile<'src> {
     } else {
       for (recipe, arguments) in evaluated {
         Self::run_recipe(
-          &arguments, config, dotenv, true, ran, recipe, scopes, search,
+          &arguments, config, dotenv, true, lazy_cache, ran, recipe, scopes, search,
         )?;
       }
     }

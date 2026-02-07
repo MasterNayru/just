@@ -176,3 +176,38 @@ fn lazy_variable_evaluated_once() {
     .stdout_regex("^PASS: \\d+\\n$")
     .success();
 }
+
+#[test]
+fn lazy_variable_same_value_across_recipes() {
+  Test::new()
+    .justfile(
+      "
+        lazy foo := `echo x >> counter; wc -l < counter | tr -d ' '`
+
+        a:
+          @echo {{ foo }}
+
+        b:
+          @echo {{ foo }}
+      ",
+    )
+    .args(["a", "b"])
+    .stdout("1\n1\n")
+    .success();
+}
+
+#[test]
+fn lazy_variable_same_name_different_modules() {
+  Test::new()
+    .justfile(
+      "
+        mod a
+        mod b
+      ",
+    )
+    .write("a.just", "lazy foo := 'A'\nrecipe:\n @echo {{ foo }}")
+    .write("b.just", "lazy foo := 'B'\nrecipe:\n @echo {{ foo }}")
+    .args(["a::recipe", "b::recipe"])
+    .stdout("A\nB\n")
+    .success();
+}

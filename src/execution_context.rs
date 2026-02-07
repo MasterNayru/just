@@ -4,6 +4,7 @@ use super::*;
 pub(crate) struct ExecutionContext<'src: 'run, 'run> {
   pub(crate) config: &'run Config,
   pub(crate) dotenv: &'run BTreeMap<String, String>,
+  pub(crate) lazy_cache: Option<&'run Mutex<BTreeMap<(String, String), String>>>,
   pub(crate) module: &'run Justfile<'src>,
   pub(crate) search: &'run Search,
 }
